@@ -5,6 +5,6 @@ SHELL=/bin/bash
 PATH=/usr/local/bin:/usr/bin:/bin
 MONITOR_DATABASE_URL=postgresql+psycopg://monitor:monitor@localhost:5432/monitor
 
-# One cron line per target so probes run in parallel at each minute boundary.
-* * * * * flock -n /tmp/esgfng-monitor-transaction-int.lock esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
-* * * * * flock -n /tmp/esgfng-monitor-discovery-int.lock esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
+# One cron line per target; probes run in parallel every minute (overlapping runs are fine).
+* * * * * esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
+* * * * * esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io

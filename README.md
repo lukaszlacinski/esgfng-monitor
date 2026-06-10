@@ -73,7 +73,7 @@ python -m esgfng_monitor probe --name transaction-int https://transaction-int.we
 
 ## Cron setup
 
-Schedule one cron entry per target so each service is probed independently and in parallel. Use `flock` to skip a run if the previous one is still in progress.
+Schedule one cron entry per target so each service is probed independently and in parallel every minute. If a probe is still running when the next minute starts, cron launches another instance — overlapping runs are expected and safe.
 
 Example crontab (also in `config/crontab.example`):
 
@@ -82,8 +82,8 @@ SHELL=/bin/bash
 PATH=/usr/local/bin:/usr/bin:/bin
 MONITOR_DATABASE_URL=postgresql+psycopg://monitor:monitor@localhost:5432/monitor
 
-* * * * * flock -n /tmp/esgfng-monitor-transaction-int.lock esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
-* * * * * flock -n /tmp/esgfng-monitor-discovery-int.lock esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
+* * * * * esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
+* * * * * esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
 ```
 
 Run `esgfng-monitor migrate` once before enabling the cron jobs.
