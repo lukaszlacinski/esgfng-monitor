@@ -1,28 +1,27 @@
 import argparse
 import logging
 import sys
-from pathlib import Path
 from urllib.parse import urlparse
 
 from alembic import command
 from alembic.config import Config
 
-from esgfng_monitor.config import get_settings
-from esgfng_monitor.db import get_session
-from esgfng_monitor.models import HealthcheckResult
-from esgfng_monitor.probe import ProbeResult, probe_target
+from config import get_settings, project_root
+from db import get_session
+from models import HealthcheckResult
+from probe import ProbeResult, probe_target
 
 logger = logging.getLogger(__name__)
 
 
 def run_migrations() -> None:
-    project_root = Path(__file__).resolve().parents[2]
-    alembic_ini = project_root / "alembic.ini"
+    root = project_root()
+    alembic_ini = root / "alembic.ini"
     if not alembic_ini.exists():
         raise FileNotFoundError(f"Alembic config not found: {alembic_ini}")
 
     alembic_cfg = Config(str(alembic_ini))
-    alembic_cfg.set_main_option("script_location", str(project_root / "alembic"))
+    alembic_cfg.set_main_option("script_location", str(root / "alembic"))
     command.upgrade(alembic_cfg, "head")
 
 
@@ -82,6 +81,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target name stored in the database (default: URL hostname)",
     )
 
+    subparsers.add_parser("serve", help="Run the web dashboard")
+
     return parser
 
 
@@ -101,6 +102,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "probe":
         result = probe_url(args.url, args.name)
         return 1 if result.error else 0
+
+    if args.command == "serve":
+        from web.app import run_server
+
+        run_server()
+        return 0
 
     return 1
 

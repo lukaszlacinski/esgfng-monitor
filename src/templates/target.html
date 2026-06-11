@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ target_name }} — ESGF-NG Monitor{% endblock %}
+
+{% block content %}
+<a class="back" href="/">← All targets</a>
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:1.1rem;">{{ target_name }}</h2>
+  {% if url %}
+  <p class="muted mono" style="margin:0;">{{ url }}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;font-size:1rem;">Response time (last {{ hours }}h)</h3>
+  {% if chart_points %}
+  <div class="chart-wrap">
+    <canvas id="timing-chart"></canvas>
+  </div>
+  {% else %}
+  <p class="empty">No data in the selected time range.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;font-size:1rem;">Recent probes</h3>
+  {% if results %}
+  <table>
+    <thead>
+      <tr>
+        <th>Checked at (UTC)</th>
+        <th>Status</th>
+        <th>HTTP</th>
+        <th>DNS</th>
+        <th>Connect</th>
+        <th>TLS</th>
+        <th>TTFB</th>
+        <th>Total</th>
+        <th>Error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in results %}
+      <tr>
+        <td class="mono">{{ row.checked_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+        <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+        <td class="mono">{% if row.http_status_code %}{{ row.http_status_code }}{% else %}—{% endif %}</td>
+        <td class="mono">{% if row.time_namelookup is not none %}{{ "%.3f"|format(row.time_namelookup) }}{% else %}—{% endif %}</td>
+        <td class="mono">{% if row.time_connect is not none %}{{ "%.3f"|format(row.time_connect) }}{% else %}—{% endif %}</td>
+        <td class="mono">{% if row.time_appconnect is not none %}{{ "%.3f"|format(row.time_appconnect) }}{% else %}—{% endif %}</td>
+        <td class="mono">{% if row.time_starttransfer is not none %}{{ "%.3f"|format(row.time_starttransfer) }}{% else %}—{% endif %}</td>
+        <td class="mono">{% if row.time_total is not none %}{{ "%.3f"|format(row.time_total) }}{% else %}—{% endif %}</td>
+        <td class="muted" style="font-size:0.82rem;max-width:14rem;">{{ row.error or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No probe results for this target.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if chart_points %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const points = {{ chart_points | tojson }};
+  const labels = points.map((p) => p.t.replace("T", " ").replace("+00:00", "Z"));
+  const data = points.map((p) => p.total);
+  const colors = points.map((p) =>
+    p.status === "ok" ? "#1a7f37" : p.status === "warn" ? "#9a6700" : "#cf222e"
+  );
+
+  new Chart(document.getElementById("timing-chart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Total time (s)",
+        data,
+        borderColor: "#0969da",
+        backgroundColor: "rgba(9, 105, 218, 0.08)",
+        pointBackgroundColor: colors,
+        pointRadius: 3,
+        tension: 0.15,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          ticks: { maxTicksLimit: 8, maxRotation: 0 },
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "seconds" },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+      },
+    },
+  });
+</script>
+{% endif %}
+{% endblock %}

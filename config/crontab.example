@@ -2,9 +2,9 @@
 ESGFNG_MONITOR_HOME=/path/to/esgfng-monitor
 
 # Run once at deploy time:
-# $ESGFNG_MONITOR_HOME/.venv/bin/esgfng-monitor migrate
+# cd $ESGFNG_MONITOR_HOME && .venv/bin/esgfng-monitor migrate
 
 # Configuration is read from $ESGFNG_MONITOR_HOME/.env (not from this crontab).
 # One cron line per target; probes run in parallel every minute (overlapping runs are fine).
-* * * * * $ESGFNG_MONITOR_HOME/.venv/bin/esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
-* * * * * $ESGFNG_MONITOR_HOME/.venv/bin/esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
+* * * * * cd $ESGFNG_MONITOR_HOME && .venv/bin/esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
+* * * * * cd $ESGFNG_MONITOR_HOME && .venv/bin/esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io

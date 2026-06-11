@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — ESGF-NG Monitor{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;font-size:1.1rem;">Targets</h2>
+  {% if targets %}
+  <table>
+    <thead>
+      <tr>
+        <th>Target</th>
+        <th>Status</th>
+        <th>HTTP</th>
+        <th>Total (s)</th>
+        <th>Last checked (UTC)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for target in targets %}
+      <tr>
+        <td>
+          <a href="/targets/{{ target.name }}"><strong>{{ target.name }}</strong></a><br>
+          <span class="muted mono" style="font-size:0.82rem;">{{ target.url }}</span>
+        </td>
+        <td><span class="badge badge-{{ target.status }}">{{ target.status }}</span></td>
+        <td class="mono">
+          {% if target.http_status_code %}{{ target.http_status_code }}{% else %}—{% endif %}
+        </td>
+        <td class="mono">
+          {% if target.time_total is not none %}{{ "%.3f"|format(target.time_total) }}{% else %}—{% endif %}
+        </td>
+        <td class="mono">{{ target.checked_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+      </tr>
+      {% if target.error %}
+      <tr>
+        <td colspan="5" class="muted" style="font-size:0.85rem;padding-top:0;">
+          {{ target.error }}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No probe results yet. Run <code>esgfng-monitor probe …</code> or wait for cron.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -26,12 +26,16 @@ Copy the example environment file and edit it for your database:
 
 ```bash
 cp config/monitor.env.example .env
+# edit .env — cron reads this file; shell exports are not used
 ```
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `MONITOR_DATABASE_URL` | yes | — | PostgreSQL URL, e.g. `postgresql+psycopg://user:pass@localhost:5432/monitor` |
 | `MONITOR_REQUEST_TIMEOUT_SECONDS` | no | `30` | Per-request timeout in seconds |
+| `MONITOR_WEB_HOST` | no | `127.0.0.1` | Web dashboard bind address |
+| `MONITOR_WEB_PORT` | no | `8080` | Web dashboard port |
+| `MONITOR_WEB_RESULTS_HOURS` | no | `24` | Hours of history on target detail pages |
 
 Settings are read from a `.env` file in the project root and from environment variables (prefixed with `MONITOR_`). Environment variables override `.env` values.
 
@@ -103,12 +107,31 @@ The command probes the URL, writes one row to PostgreSQL, and exits. It returns 
 ### Run from Python
 
 ```bash
-python -m esgfng_monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
+python -m monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
 ```
+
+### Web dashboard
+
+Start the dashboard (reads probe results from PostgreSQL):
+
+```bash
+esgfng-monitor serve
+```
+
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080). Pages:
+
+| URL | Description |
+|-----|-------------|
+| `/` | Overview of all targets with latest status |
+| `/targets/{name}` | Response-time chart and recent probes for one target |
+| `/api/targets` | JSON summary of latest results per target |
+| `/api/targets/{name}/results` | JSON time series for charts |
+
+Bind to all interfaces with `MONITOR_WEB_HOST=0.0.0.0` in `.env` when running behind a reverse proxy.
 
 ## Cron setup
 
-Cron does not load your shell profile, so `esgfng-monitor` will not be on `PATH`. Use the full path to the executable inside the project virtualenv. Database settings and other configuration are read from `.env` in the project root — do not duplicate them in the crontab.
+Cron does not load your shell profile, so `esgfng-monitor` will not be on `PATH`. Each job changes into the project directory first, then runs `.venv/bin/esgfng-monitor`. Database settings and other configuration are read from `.env` in the project root — do not duplicate them in the crontab.
 
 1. Copy and edit the example crontab; set `ESGFNG_MONITOR_HOME` to your clone directory:
 
@@ -119,10 +142,10 @@ cp config/crontab.example /tmp/esgfng-monitor-cron
 
 2. Ensure `.env` exists in that directory (`cp config/monitor.env.example .env`).
 
-3. Run migrations once using the full path:
+3. Run migrations once:
 
 ```bash
-/path/to/esgfng-monitor/.venv/bin/esgfng-monitor migrate
+cd /path/to/esgfng-monitor && .venv/bin/esgfng-monitor migrate
 ```
 
 4. Install the crontab:
@@ -136,8 +159,8 @@ Example crontab (also in `config/crontab.example`):
 ```cron
 ESGFNG_MONITOR_HOME=/home/ubuntu/esgfng-monitor
 
-* * * * * $ESGFNG_MONITOR_HOME/.venv/bin/esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
-* * * * * $ESGFNG_MONITOR_HOME/.venv/bin/esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
+* * * * * cd $ESGFNG_MONITOR_HOME && .venv/bin/esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
+* * * * * cd $ESGFNG_MONITOR_HOME && .venv/bin/esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
 ```
 
 Schedule one cron entry per target so each service is probed independently and in parallel every minute. If a probe is still running when the next minute starts, cron launches another instance — overlapping runs are expected and safe.
