@@ -58,10 +58,7 @@ def create_app() -> FastAPI:
                 {
                     "checked_at": result.checked_at,
                     "http_status_code": result.http_status_code,
-                    "time_namelookup": queries.as_float(result.time_namelookup),
-                    "time_connect": queries.as_float(result.time_connect),
-                    "time_appconnect": queries.as_float(result.time_appconnect),
-                    "time_starttransfer": queries.as_float(result.time_starttransfer),
+                    "segments": queries.timing_segments(result),
                     "time_total": queries.as_float(result.time_total),
                     "error": result.error,
                     "status": queries.result_status(result),

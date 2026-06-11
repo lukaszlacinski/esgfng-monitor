@@ -76,10 +76,39 @@ def recent_results(
     )
 
 
+def _delta(earlier: float | None, later: float | None) -> float:
+    if later is None:
+        return 0.0
+    if earlier is None:
+        return later
+    return max(0.0, later - earlier)
+
+
+def timing_segments(result: HealthcheckResult) -> dict[str, float]:
+    """Break cumulative curl timings into stacked segments (seconds)."""
+    namelookup = as_float(result.time_namelookup)
+    connect = as_float(result.time_connect)
+    appconnect = as_float(result.time_appconnect)
+    pretransfer = as_float(result.time_pretransfer)
+    starttransfer = as_float(result.time_starttransfer)
+    total = as_float(result.time_total)
+
+    return {
+        "dns": namelookup or 0.0,
+        "tcp": _delta(namelookup, connect),
+        "tls": _delta(connect, appconnect),
+        "request": _delta(appconnect, pretransfer),
+        "server": _delta(pretransfer, starttransfer),
+        "transfer": _delta(starttransfer, total),
+    }
+
+
 def result_to_chart_point(result: HealthcheckResult) -> dict:
+    segments = timing_segments(result)
     return {
         "t": result.checked_at.isoformat(),
         "total": as_float(result.time_total),
         "status": result_status(result),
         "code": result.http_status_code,
+        **segments,
     }

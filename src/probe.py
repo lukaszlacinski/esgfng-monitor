@@ -1,25 +1,31 @@
-import time
-from dataclasses import dataclass, field
+import shutil
+import subprocess
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
 
-import httpcore
+CURL_WRITEOUT = "\t".join(
+    [
+        "%{time_namelookup}",
+        "%{time_connect}",
+        "%{time_appconnect}",
+        "%{time_pretransfer}",
+        "%{time_starttransfer}",
+        "%{time_total}",
+        "%{http_code}",
+    ]
+)
 
 
 @dataclass
 class CurlTimings:
     """Timing fields matching curl -w output (values in seconds)."""
 
-    started_at: float = field(default_factory=time.perf_counter)
     time_namelookup: float | None = None
     time_connect: float | None = None
     time_appconnect: float | None = None
     time_pretransfer: float | None = None
     time_starttransfer: float | None = None
     time_total: float | None = None
-
-    def elapsed(self) -> float:
-        return time.perf_counter() - self.started_at
 
 
 @dataclass
@@ -32,26 +38,23 @@ class ProbeResult:
     error: str | None = None
 
 
-def _make_trace_handler(timings: CurlTimings):
-    def trace(event_name: str, info: dict[str, Any]) -> None:
-        elapsed = time.perf_counter() - timings.started_at
-        if event_name == "connection.connect_tcp.started":
-            timings.time_namelookup = elapsed
-        elif event_name == "connection.connect_tcp.complete":
-            timings.time_connect = elapsed
-            if timings.time_appconnect is None:
-                timings.time_appconnect = elapsed
-                timings.time_pretransfer = elapsed
-        elif event_name == "connection.start_tls.complete":
-            timings.time_appconnect = elapsed
-            timings.time_pretransfer = elapsed
-        elif event_name in (
-            "http11.receive_response_headers.complete",
-            "http2.receive_response_headers.complete",
-        ):
-            timings.time_starttransfer = elapsed
+def _parse_curl_output(stdout: str) -> tuple[CurlTimings, int | None]:
+    line = stdout.strip().splitlines()[-1] if stdout.strip() else ""
+    parts = line.split("\t")
+    if len(parts) != 7:
+        raise ValueError(f"unexpected curl output: {stdout!r}")
 
-    return trace
+    timings = CurlTimings(
+        time_namelookup=float(parts[0]),
+        time_connect=float(parts[1]),
+        time_appconnect=float(parts[2]),
+        time_pretransfer=float(parts[3]),
+        time_starttransfer=float(parts[4]),
+        time_total=float(parts[5]),
+    )
+    if parts[6] == "000":
+        return timings, None
+    return timings, int(parts[6])
 
 
 def probe_target(
@@ -59,33 +62,49 @@ def probe_target(
     url: str,
     timeout_seconds: float,
 ) -> ProbeResult:
-    timings = CurlTimings()
     checked_at = datetime.now(timezone.utc)
+    timings = CurlTimings()
     http_status_code: int | None = None
     error: str | None = None
 
+    curl = shutil.which("curl")
+    if curl is None:
+        return ProbeResult(
+            target_name=target_name,
+            url=url,
+            checked_at=checked_at,
+            http_status_code=None,
+            timings=timings,
+            error="curl not found in PATH",
+        )
+
     try:
-        timeout = {
-            "connect": timeout_seconds,
-            "read": timeout_seconds,
-            "write": timeout_seconds,
-            "pool": timeout_seconds,
-        }
-        with httpcore.ConnectionPool() as pool:
-            response = pool.request(
-                "GET",
-                httpcore.URL(url),
-                extensions={
-                    "trace": _make_trace_handler(timings),
-                    "timeout": timeout,
-                },
-            )
-            http_status_code = response.status
-            response.read()
+        completed = subprocess.run(
+            [
+                curl,
+                "-o",
+                "/dev/null",
+                "-s",
+                "-m",
+                str(int(timeout_seconds)),
+                "-w",
+                CURL_WRITEOUT,
+                url,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds + 5,
+            check=False,
+        )
+        timings, http_status_code = _parse_curl_output(completed.stdout)
+        if completed.returncode != 0:
+            error = completed.stderr.strip() or f"curl exited with code {completed.returncode}"
+        elif http_status_code is None:
+            error = "connection failed"
+    except subprocess.TimeoutExpired:
+        error = f"curl timed out after {timeout_seconds}s"
     except Exception as exc:  # noqa: BLE001
         error = str(exc)
-    finally:
-        timings.time_total = timings.elapsed()
 
     return ProbeResult(
         target_name=target_name,

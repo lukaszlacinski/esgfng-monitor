@@ -8,6 +8,7 @@ Each probe runs as a short-lived process with the target URL passed on the comma
 
 - Python 3.10+
 - PostgreSQL
+- `curl` (probes use `curl -w` for timing measurements)
 
 ## Installation
 

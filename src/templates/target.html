@@ -13,7 +13,7 @@
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0;font-size:1rem;">Response time (last {{ hours }}h)</h3>
+  <h3 style="margin-top:0;font-size:1rem;">Response time breakdown (last {{ hours }}h)</h3>
   {% if chart_points %}
   <div class="chart-wrap">
     <canvas id="timing-chart"></canvas>
@@ -33,9 +33,11 @@
         <th>Status</th>
         <th>HTTP</th>
         <th>DNS</th>
-        <th>Connect</th>
+        <th>TCP</th>
         <th>TLS</th>
-        <th>TTFB</th>
+        <th>Request</th>
+        <th>Server</th>
+        <th>Transfer</th>
         <th>Total</th>
         <th>Error</th>
       </tr>
@@ -46,10 +48,12 @@
         <td class="mono">{{ row.checked_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
         <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
         <td class="mono">{% if row.http_status_code %}{{ row.http_status_code }}{% else %}—{% endif %}</td>
-        <td class="mono">{% if row.time_namelookup is not none %}{{ "%.3f"|format(row.time_namelookup) }}{% else %}—{% endif %}</td>
-        <td class="mono">{% if row.time_connect is not none %}{{ "%.3f"|format(row.time_connect) }}{% else %}—{% endif %}</td>
-        <td class="mono">{% if row.time_appconnect is not none %}{{ "%.3f"|format(row.time_appconnect) }}{% else %}—{% endif %}</td>
-        <td class="mono">{% if row.time_starttransfer is not none %}{{ "%.3f"|format(row.time_starttransfer) }}{% else %}—{% endif %}</td>
+        <td class="mono">{{ "%.3f"|format(row.segments.dns) }}</td>
+        <td class="mono">{{ "%.3f"|format(row.segments.tcp) }}</td>
+        <td class="mono">{{ "%.3f"|format(row.segments.tls) }}</td>
+        <td class="mono">{{ "%.3f"|format(row.segments.request) }}</td>
+        <td class="mono">{{ "%.3f"|format(row.segments.server) }}</td>
+        <td class="mono">{{ "%.3f"|format(row.segments.transfer) }}</td>
         <td class="mono">{% if row.time_total is not none %}{{ "%.3f"|format(row.time_total) }}{% else %}—{% endif %}</td>
         <td class="muted" style="font-size:0.82rem;max-width:14rem;">{{ row.error or "" }}</td>
       </tr>
@@ -68,40 +72,57 @@
 <script>
   const points = {{ chart_points | tojson }};
   const labels = points.map((p) => p.t.replace("T", " ").replace("+00:00", "Z"));
-  const data = points.map((p) => p.total);
-  const colors = points.map((p) =>
-    p.status === "ok" ? "#1a7f37" : p.status === "warn" ? "#9a6700" : "#cf222e"
-  );
+
+  const segmentDefs = [
+    { key: "dns", label: "DNS", color: "#8250df" },
+    { key: "tcp", label: "TCP", color: "#0969da" },
+    { key: "tls", label: "TLS", color: "#1a7f37" },
+    { key: "request", label: "Request", color: "#bf8700" },
+    { key: "server", label: "Server", color: "#cf222e" },
+    { key: "transfer", label: "Transfer", color: "#656d76" },
+  ];
 
   new Chart(document.getElementById("timing-chart"), {
     type: "line",
     data: {
       labels,
-      datasets: [{
-        label: "Total time (s)",
-        data,
-        borderColor: "#0969da",
-        backgroundColor: "rgba(9, 105, 218, 0.08)",
-        pointBackgroundColor: colors,
-        pointRadius: 3,
-        tension: 0.15,
+      datasets: segmentDefs.map((segment) => ({
+        label: segment.label,
+        data: points.map((p) => p[segment.key] ?? 0),
+        backgroundColor: segment.color + "b3",
+        borderColor: segment.color,
+        borderWidth: 1,
+        pointRadius: 0,
         fill: true,
-      }],
+        stack: "timing",
+        tension: 0.15,
+      })),
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
       scales: {
         x: {
+          stacked: true,
           ticks: { maxTicksLimit: 8, maxRotation: 0 },
         },
         y: {
+          stacked: true,
           beginAtZero: true,
           title: { display: true, text: "seconds" },
         },
       },
       plugins: {
-        legend: { display: false },
+        legend: { position: "bottom" },
+        tooltip: {
+          callbacks: {
+            footer(items) {
+              const total = items.reduce((sum, item) => sum + item.parsed.y, 0);
+              return `Total: ${total.toFixed(3)}s`;
+            },
+          },
+        },
       },
     },
   });
