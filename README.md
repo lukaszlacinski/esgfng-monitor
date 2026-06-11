@@ -37,13 +37,48 @@ Settings are read from environment variables (prefixed with `MONITOR_`) and from
 
 ## Database setup
 
-Create an empty PostgreSQL database, then run migrations once:
+### PostgreSQL on Ubuntu
+
+Install PostgreSQL:
+
+```bash
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+```
+
+Create the `monitor` user and database (matches `config/monitor.env.example`; change the password in production):
+
+```bash
+sudo -u postgres psql <<'EOF'
+CREATE USER monitor WITH PASSWORD 'monitor';
+CREATE DATABASE monitor OWNER monitor;
+GRANT ALL PRIVILEGES ON DATABASE monitor TO monitor;
+EOF
+```
+
+On PostgreSQL 15 and later, also grant schema permissions so migrations can create tables:
+
+```bash
+sudo -u postgres psql -d monitor <<'EOF'
+GRANT ALL ON SCHEMA public TO monitor;
+EOF
+```
+
+Verify the connection:
+
+```bash
+psql "postgresql://monitor:monitor@localhost:5432/monitor" -c '\conninfo'
+```
+
+### Run migrations
+
+Create the `healthcheck_results` table:
 
 ```bash
 esgfng-monitor migrate
 ```
 
-This creates the `healthcheck_results` table. Re-run after pulling schema changes.
+Re-run after pulling schema changes.
 
 You can also use Alembic directly:
 
