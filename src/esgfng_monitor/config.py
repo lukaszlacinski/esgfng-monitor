@@ -1,13 +1,25 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def project_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "alembic.ini").is_file():
+            return parent
+    raise RuntimeError("Could not find project root (alembic.ini)")
+
+
+def env_file_path() -> Path:
+    return project_root() / ".env"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="MONITOR_",
-        env_file=".env",
+        env_file=env_file_path(),
         extra="ignore",
     )
 

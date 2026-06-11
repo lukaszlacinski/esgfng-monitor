@@ -33,7 +33,7 @@ cp config/monitor.env.example .env
 | `MONITOR_DATABASE_URL` | yes | — | PostgreSQL URL, e.g. `postgresql+psycopg://user:pass@localhost:5432/monitor` |
 | `MONITOR_REQUEST_TIMEOUT_SECONDS` | no | `30` | Per-request timeout in seconds |
 
-Settings are read from environment variables (prefixed with `MONITOR_`) and from a `.env` file in the working directory.
+Settings are read from a `.env` file in the project root and from environment variables (prefixed with `MONITOR_`). Environment variables override `.env` values.
 
 ## Database setup
 
@@ -108,26 +108,39 @@ python -m esgfng_monitor probe --name transaction-int https://transaction-int.we
 
 ## Cron setup
 
-Schedule one cron entry per target so each service is probed independently and in parallel every minute. If a probe is still running when the next minute starts, cron launches another instance — overlapping runs are expected and safe.
+Cron does not load your shell profile, so `esgfng-monitor` will not be on `PATH`. Use the full path to the executable inside the project virtualenv. Database settings and other configuration are read from `.env` in the project root — do not duplicate them in the crontab.
+
+1. Copy and edit the example crontab; set `ESGFNG_MONITOR_HOME` to your clone directory:
+
+```bash
+cp config/crontab.example /tmp/esgfng-monitor-cron
+# edit ESGFNG_MONITOR_HOME=/home/ubuntu/esgfng-monitor
+```
+
+2. Ensure `.env` exists in that directory (`cp config/monitor.env.example .env`).
+
+3. Run migrations once using the full path:
+
+```bash
+/path/to/esgfng-monitor/.venv/bin/esgfng-monitor migrate
+```
+
+4. Install the crontab:
+
+```bash
+crontab /tmp/esgfng-monitor-cron
+```
 
 Example crontab (also in `config/crontab.example`):
 
 ```cron
-SHELL=/bin/bash
-PATH=/usr/local/bin:/usr/bin:/bin
-MONITOR_DATABASE_URL=postgresql+psycopg://monitor:monitor@localhost:5432/monitor
+ESGFNG_MONITOR_HOME=/home/ubuntu/esgfng-monitor
 
-* * * * * esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
-* * * * * esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
+* * * * * $ESGFNG_MONITOR_HOME/.venv/bin/esgfng-monitor probe --name transaction-int https://transaction-int.west.esgf.io/healthcheck
+* * * * * $ESGFNG_MONITOR_HOME/.venv/bin/esgfng-monitor probe --name discovery-int https://discovery-int.west.esgf.io
 ```
 
-Run `esgfng-monitor migrate` once before enabling the cron jobs.
-
-Install the crontab:
-
-```bash
-crontab config/crontab.example   # review and edit first
-```
+Schedule one cron entry per target so each service is probed independently and in parallel every minute. If a probe is still running when the next minute starts, cron launches another instance — overlapping runs are expected and safe.
 
 ## Stored data
 
