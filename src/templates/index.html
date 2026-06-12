@@ -21,7 +21,7 @@
       <p class="muted" style="margin:0.35rem 0 0;font-size:0.85rem;">{{ target.error }}</p>
       {% endif %}
     </div>
-    <h3 style="margin:1rem 0 0;font-size:0.95rem;">Response time (last {{ hours }}h)</h3>
+    <h3 class="section-heading">Response time (last {{ hours }}h)</h3>
     <p class="muted" style="margin:0.25rem 0 0.75rem;font-size:0.85rem;">
       Stacked per-step timings. Tooltip shows step increment and cumulative curl value.
     </p>
@@ -44,8 +44,8 @@
       <canvas id="chart-{{ target.chart_id }}"></canvas>
     </div>
     <div class="stats-wrap">
-      <table class="stats-table mono" id="stats-chart-{{ target.chart_id }}">
-        <caption class="muted">Per-step timings (s), visible range; Total is full request time</caption>
+      <h3 class="section-heading">Per-step timings (s), visible range</h3>
+      <table class="stats-table" id="stats-chart-{{ target.chart_id }}">
         <thead>
           <tr>
             <th scope="col"></th>
