@@ -50,7 +50,7 @@
           <tr>
             <th scope="col"></th>
             <th scope="col">DNS Lookup</th>
-            <th scope="col">TCP Connect</th>
+            <th scope="col">TCP Handshake</th>
             <th scope="col">TLS Handshake</th>
             <th scope="col">TTFB</th>
             <th scope="col">Total</th>
@@ -116,7 +116,7 @@
 
   const segmentDefs = [
     { key: "time_namelookup", label: "DNS Lookup", color: "#FF66FF" },
-    { key: "time_connect", label: "TCP Connect", color: "#5599FF" },
+    { key: "time_connect", label: "TCP Handshake", color: "#5599FF" },
     { key: "time_appconnect", label: "TLS Handshake", color: "#66FF44" },
     { key: "time_starttransfer", label: "TTFB", color: "#FF5588" },
     { key: "time_total", label: "Total", color: "#66FFFF", statsCumulative: true },
@@ -129,9 +129,22 @@
     return point[segment.key];
   }
 
+  function formatChartLabel(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) {
+      return iso
+        .replace("T", " ")
+        .replace(/\.\d+/, "")
+        .replace(/:\d{2}(Z|[+-]\d{2}:\d{2})$/, "")
+        .replace(/(Z|[+-]\d{2}:\d{2})$/, "");
+    }
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  }
+
   function chartData(points) {
     return {
-      labels: points.map((p) => p.t.replace("T", " ").replace("+00:00", "Z")),
+      labels: points.map((p) => formatChartLabel(p.t)),
       datasets: segmentDefs.map((segment) => ({
         label: segment.label,
         data: points.map((p) => p[segment.key] ?? 0),
