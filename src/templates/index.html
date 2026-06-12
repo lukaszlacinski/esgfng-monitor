@@ -23,7 +23,7 @@
     </div>
     <h3 style="margin:1rem 0 0;font-size:0.95rem;">Response time (last {{ hours }}h)</h3>
     <p class="muted" style="margin:0.25rem 0 0.75rem;font-size:0.85rem;">
-      Stacked curl timing increments. Tooltip shows cumulative database values.
+      Stacked per-step timings. Tooltip shows step increment and cumulative curl value.
     </p>
     {% if target.chart_points %}
     <div class="chart-toolbar">
@@ -45,30 +45,29 @@
     </div>
     <div class="stats-wrap">
       <table class="stats-table mono" id="stats-chart-{{ target.chart_id }}">
-        <caption class="muted">Per-step timings (s), visible range</caption>
+        <caption class="muted">Per-step timings (s), visible range; Total is full request time</caption>
         <thead>
           <tr>
             <th scope="col"></th>
-            <th scope="col">namelookup</th>
-            <th scope="col">connect</th>
-            <th scope="col">appconnect</th>
-            <th scope="col">pretransfer</th>
-            <th scope="col">starttransfer</th>
-            <th scope="col">total</th>
+            <th scope="col">DNS Lookup</th>
+            <th scope="col">TCP Connect</th>
+            <th scope="col">TLS Handshake</th>
+            <th scope="col">TTFB</th>
+            <th scope="col">Total</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <th scope="row">min</th>
-            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
           </tr>
           <tr>
             <th scope="row">median</th>
-            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
           </tr>
           <tr>
             <th scope="row">max</th>
-            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
           </tr>
         </tbody>
       </table>
@@ -91,10 +90,6 @@
 <script>
   const targets = {{ targets | tojson }};
   const CHART_HOURS = {{ hours }};
-
-  function timingLabel(key) {
-    return key.startsWith("time_") ? key.slice(5) : key;
-  }
 
   const Y_AXIS_DEFAULT = 10;
   const Y_AXIS_MIN = 0.1;
@@ -120,13 +115,19 @@
   }
 
   const segmentDefs = [
-    { key: "time_namelookup", color: "#FF66FF" },
-    { key: "time_connect", color: "#5599FF" },
-    { key: "time_appconnect", color: "#66FF44" },
-    { key: "time_pretransfer", color: "#FFEE33" },
-    { key: "time_starttransfer", color: "#FF5588" },
-    { key: "time_total", color: "#66FFFF" },
-  ].map((segment) => ({ ...segment, label: timingLabel(segment.key) }));
+    { key: "time_namelookup", label: "DNS Lookup", color: "#FF66FF" },
+    { key: "time_connect", label: "TCP Connect", color: "#5599FF" },
+    { key: "time_appconnect", label: "TLS Handshake", color: "#66FF44" },
+    { key: "time_starttransfer", label: "TTFB", color: "#FF5588" },
+    { key: "time_total", label: "Total", color: "#66FFFF", statsCumulative: true },
+  ];
+
+  function statsValue(point, segment) {
+    if (segment.statsCumulative) {
+      return point.cumulative[segment.key];
+    }
+    return point[segment.key];
+  }
 
   function chartData(points) {
     return {
@@ -167,7 +168,7 @@
     const stats = {};
     for (const segment of segmentDefs) {
       const values = points
-        .map((point) => point[segment.key])
+        .map((point) => statsValue(point, segment))
         .filter((value) => value != null);
       stats[segment.key] = {
         min: values.length ? Math.min(...values) : null,

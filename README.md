@@ -220,12 +220,11 @@ Each probe inserts a row into `healthcheck_results` with:
 | `url` | Probed URL |
 | `checked_at` | UTC timestamp when the probe started |
 | `http_status_code` | HTTP response status (null on failure) |
-| `time_namelookup` | DNS lookup time (seconds) |
-| `time_connect` | TCP connect time (seconds) |
-| `time_appconnect` | TLS handshake time (seconds) |
-| `time_pretransfer` | Time until transfer start (seconds) |
-| `time_starttransfer` | Time to first byte (seconds) |
-| `time_total` | Total request time (seconds) |
+| `time_namelookup` | DNS lookup time (seconds, cumulative) |
+| `time_connect` | TCP connect time (seconds, cumulative) |
+| `time_appconnect` | TLS handshake time (seconds, cumulative) |
+| `time_starttransfer` | Time to first byte (seconds, cumulative) |
+| `time_total` | Total request time (seconds, cumulative) |
 | `error` | Error message if the probe failed |
 
 Timing fields match the values produced by `curl -w`.

@@ -28,7 +28,6 @@ class HealthcheckResult(Base):
     time_namelookup: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
     time_connect: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
     time_appconnect: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
-    time_pretransfer: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
     time_starttransfer: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
     time_total: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)

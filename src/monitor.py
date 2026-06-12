@@ -37,7 +37,6 @@ def store_result(result: ProbeResult) -> None:
                 time_namelookup=timings.time_namelookup,
                 time_connect=timings.time_connect,
                 time_appconnect=timings.time_appconnect,
-                time_pretransfer=timings.time_pretransfer,
                 time_starttransfer=timings.time_starttransfer,
                 time_total=timings.time_total,
                 error=result.error,

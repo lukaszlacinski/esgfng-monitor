@@ -11,7 +11,6 @@ CURL_TIMING_FIELDS = (
     "time_namelookup",
     "time_connect",
     "time_appconnect",
-    "time_pretransfer",
     "time_starttransfer",
     "time_total",
 )

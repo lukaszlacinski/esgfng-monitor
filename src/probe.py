@@ -8,7 +8,6 @@ CURL_WRITEOUT = "\t".join(
         "%{time_namelookup}",
         "%{time_connect}",
         "%{time_appconnect}",
-        "%{time_pretransfer}",
         "%{time_starttransfer}",
         "%{time_total}",
         "%{http_code}",
@@ -23,7 +22,6 @@ class CurlTimings:
     time_namelookup: float | None = None
     time_connect: float | None = None
     time_appconnect: float | None = None
-    time_pretransfer: float | None = None
     time_starttransfer: float | None = None
     time_total: float | None = None
 
@@ -41,20 +39,19 @@ class ProbeResult:
 def _parse_curl_output(stdout: str) -> tuple[CurlTimings, int | None]:
     line = stdout.strip().splitlines()[-1] if stdout.strip() else ""
     parts = line.split("\t")
-    if len(parts) != 7:
+    if len(parts) != 6:
         raise ValueError(f"unexpected curl output: {stdout!r}")
 
     timings = CurlTimings(
         time_namelookup=float(parts[0]),
         time_connect=float(parts[1]),
         time_appconnect=float(parts[2]),
-        time_pretransfer=float(parts[3]),
-        time_starttransfer=float(parts[4]),
-        time_total=float(parts[5]),
+        time_starttransfer=float(parts[3]),
+        time_total=float(parts[4]),
     )
-    if parts[6] == "000":
+    if parts[5] == "000":
         return timings, None
-    return timings, int(parts[6])
+    return timings, int(parts[5])
 
 
 def probe_target(
