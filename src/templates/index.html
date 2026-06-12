@@ -3,47 +3,316 @@
 {% block title %}Dashboard — ESGF-NG Monitor{% endblock %}
 
 {% block content %}
-<div class="card">
-  <h2 style="margin-top:0;font-size:1.1rem;">Targets</h2>
-  {% if targets %}
-  <table>
-    <thead>
-      <tr>
-        <th>Target</th>
-        <th>Status</th>
-        <th>HTTP</th>
-        <th>Total (s)</th>
-        <th>Last checked (UTC)</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for target in targets %}
-      <tr>
-        <td>
-          <a href="/targets/{{ target.name }}"><strong>{{ target.name }}</strong></a><br>
-          <span class="muted mono" style="font-size:0.82rem;">{{ target.url }}</span>
-        </td>
-        <td><span class="badge badge-{{ target.status }}">{{ target.status }}</span></td>
-        <td class="mono">
-          {% if target.http_status_code %}{{ target.http_status_code }}{% else %}—{% endif %}
-        </td>
-        <td class="mono">
-          {% if target.time_total is not none %}{{ "%.3f"|format(target.time_total) }}{% else %}—{% endif %}
-        </td>
-        <td class="mono">{{ target.checked_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-      </tr>
-      {% if target.error %}
-      <tr>
-        <td colspan="5" class="muted" style="font-size:0.85rem;padding-top:0;">
-          {{ target.error }}
-        </td>
-      </tr>
+{% if targets %}
+  {% for target in targets %}
+  <div class="card">
+    <div class="target-header">
+      <h2 style="margin:0;font-size:1.1rem;">
+        {{ target.name }}
+        <span class="badge badge-{{ target.status }}">{{ target.status }}</span>
+        {% if target.http_status_code %}
+        <span class="muted mono" style="font-size:0.85rem;font-weight:normal;">HTTP {{ target.http_status_code }}</span>
+        {% endif %}
+      </h2>
+      {% if target.url %}
+      <p class="muted mono" style="margin:0.35rem 0 0;font-size:0.82rem;">{{ target.url }}</p>
       {% endif %}
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="empty">No probe results yet. Run <code>esgfng-monitor probe …</code> or wait for cron.</p>
-  {% endif %}
-</div>
+      {% if target.error %}
+      <p class="muted" style="margin:0.35rem 0 0;font-size:0.85rem;">{{ target.error }}</p>
+      {% endif %}
+    </div>
+    <h3 style="margin:1rem 0 0;font-size:0.95rem;">Response time (last {{ hours }}h)</h3>
+    <p class="muted" style="margin:0.25rem 0 0.75rem;font-size:0.85rem;">
+      Stacked curl timing increments. Tooltip shows cumulative database values.
+    </p>
+    {% if target.chart_points %}
+    <div class="chart-toolbar">
+      <div class="chart-toolbar-group">
+        <span class="muted">Y max</span>
+        <button type="button" class="axis-btn y-axis-btn" data-chart="chart-{{ target.chart_id }}" data-delta="-1" aria-label="Decrease Y axis maximum">−</button>
+        <span class="mono y-axis-max" id="y-max-chart-{{ target.chart_id }}">10s</span>
+        <button type="button" class="axis-btn y-axis-btn" data-chart="chart-{{ target.chart_id }}" data-delta="1" aria-label="Increase Y axis maximum">+</button>
+      </div>
+      <div class="chart-toolbar-group">
+        <span class="muted">X range</span>
+        <button type="button" class="axis-btn x-axis-btn" data-chart="chart-{{ target.chart_id }}" data-factor="0.5" aria-label="Halve X axis time range">−</button>
+        <span class="mono x-axis-range" id="x-range-chart-{{ target.chart_id }}">{{ hours }}h</span>
+        <button type="button" class="axis-btn x-axis-btn" data-chart="chart-{{ target.chart_id }}" data-factor="2" aria-label="Double X axis time range">+</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart-{{ target.chart_id }}"></canvas>
+    </div>
+    <div class="stats-wrap">
+      <table class="stats-table mono" id="stats-chart-{{ target.chart_id }}">
+        <caption class="muted">Cumulative timings (s), visible range</caption>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">namelookup</th>
+            <th scope="col">connect</th>
+            <th scope="col">appconnect</th>
+            <th scope="col">pretransfer</th>
+            <th scope="col">starttransfer</th>
+            <th scope="col">total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">min</th>
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+          </tr>
+          <tr>
+            <th scope="row">median</th>
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+          </tr>
+          <tr>
+            <th scope="row">max</th>
+            <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">No data in the selected time range.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card">
+    <p class="empty">No probe results yet. Run <code>esgfng-monitor probe …</code> or wait for cron.</p>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if targets %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const targets = {{ targets | tojson }};
+  const CHART_HOURS = {{ hours }};
+
+  function timingLabel(key) {
+    return key.startsWith("time_") ? key.slice(5) : key;
+  }
+
+  const Y_AXIS_DEFAULT = 10;
+  const Y_AXIS_MIN = 0.1;
+  const chartState = new Map();
+
+  function yAxisStep(yMax) {
+    return yMax <= 1 ? 0.1 : 1;
+  }
+
+  function formatYMax(yMax) {
+    return yMax <= 1 ? `${yMax.toFixed(1)}s` : `${yMax}s`;
+  }
+
+  function formatXRange(xViewFraction, hours) {
+    const visible = hours * xViewFraction;
+    if (xViewFraction >= 1) return `${hours}h`;
+    if (visible < 1) return `${visible.toFixed(1)}h`;
+    return `${Math.round(visible * 10) / 10}h`;
+  }
+
+  function minXViewFraction(pointCount) {
+    return Math.max(2 / pointCount, 1 / 128);
+  }
+
+  const segmentDefs = [
+    { key: "time_namelookup", color: "#FF66FF" },
+    { key: "time_connect", color: "#5599FF" },
+    { key: "time_appconnect", color: "#66FF44" },
+    { key: "time_pretransfer", color: "#FFEE33" },
+    { key: "time_starttransfer", color: "#FF5588" },
+    { key: "time_total", color: "#66FFFF" },
+  ].map((segment) => ({ ...segment, label: timingLabel(segment.key) }));
+
+  function chartData(points) {
+    return {
+      labels: points.map((p) => p.t.replace("T", " ").replace("+00:00", "Z")),
+      datasets: segmentDefs.map((segment) => ({
+        label: segment.label,
+        data: points.map((p) => p[segment.key] ?? 0),
+        backgroundColor: segment.color,
+        borderColor: "#F0F0F0",
+        borderWidth: 1,
+        pointRadius: 0,
+        fill: true,
+        stack: "timing",
+        tension: 0.15,
+      })),
+    };
+  }
+
+  function visiblePoints(allPoints, xViewFraction) {
+    const count = Math.max(2, Math.ceil(allPoints.length * xViewFraction));
+    return allPoints.slice(-count);
+  }
+
+  function median(values) {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  }
+
+  function formatStat(value) {
+    return value == null ? "—" : value.toFixed(3);
+  }
+
+  function computeTimingStats(points) {
+    const stats = {};
+    for (const segment of segmentDefs) {
+      const values = points
+        .map((point) => point.cumulative[segment.key])
+        .filter((value) => value != null);
+      stats[segment.key] = {
+        min: values.length ? Math.min(...values) : null,
+        median: median(values),
+        max: values.length ? Math.max(...values) : null,
+      };
+    }
+    return stats;
+  }
+
+  function updateStatsTable(canvasId, points) {
+    const table = document.getElementById(`stats-${canvasId}`);
+    if (!table) return;
+    const stats = computeTimingStats(points);
+    const statKeys = ["min", "median", "max"];
+    table.querySelectorAll("tbody tr").forEach((row, rowIndex) => {
+      row.querySelectorAll("td").forEach((cell, colIndex) => {
+        const segment = segmentDefs[colIndex];
+        cell.textContent = formatStat(stats[segment.key][statKeys[rowIndex]]);
+      });
+    });
+  }
+
+  function buildChart(canvasId, allPoints, yMax, hours) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+      console.error(`Chart canvas not found: ${canvasId}`);
+      return null;
+    }
+
+    const state = {
+      chart: null,
+      yMax,
+      hours,
+      allPoints,
+      xViewFraction: 1,
+      visiblePoints: allPoints,
+    };
+
+    const chart = new Chart(canvas, {
+      type: "line",
+      data: chartData(allPoints),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: { maxTicksLimit: 8, maxRotation: 0 },
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            max: yMax,
+            title: { display: true, text: "seconds" },
+          },
+        },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const point = state.visiblePoints[context.dataIndex];
+                const segment = segmentDefs[context.datasetIndex];
+                const increment = context.parsed.y;
+                const cumulative = point.cumulative[segment.key];
+                const cumulativeText = cumulative == null ? "—" : `${cumulative.toFixed(3)}s`;
+                return `${segment.label}: +${increment.toFixed(3)}s (cumulative ${cumulativeText})`;
+              },
+              footer(items) {
+                if (items.length === 0) return "";
+                const point = state.visiblePoints[items[0].dataIndex];
+                const total = point.cumulative.time_total;
+                return total == null ? "" : `total: ${total.toFixed(3)}s`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    state.chart = chart;
+    chartState.set(canvasId, state);
+    updateStatsTable(canvasId, state.visiblePoints);
+    return chart;
+  }
+
+  function updateChartView(canvasId) {
+    const state = chartState.get(canvasId);
+    if (!state) return;
+    state.visiblePoints = visiblePoints(state.allPoints, state.xViewFraction);
+    state.chart.data = chartData(state.visiblePoints);
+    state.chart.update();
+    updateStatsTable(canvasId, state.visiblePoints);
+    const label = document.getElementById(`x-range-${canvasId}`);
+    if (label) label.textContent = formatXRange(state.xViewFraction, state.hours);
+  }
+
+  function setYAxisMax(canvasId, yMax) {
+    const state = chartState.get(canvasId);
+    if (!state) return;
+    state.yMax = yMax;
+    state.chart.options.scales.y.max = yMax;
+    state.chart.update();
+    const label = document.getElementById(`y-max-${canvasId}`);
+    if (label) label.textContent = formatYMax(yMax);
+  }
+
+  targets.forEach((target) => {
+    if (target.chart_points.length > 0) {
+      const canvasId = `chart-${target.chart_id}`;
+      buildChart(canvasId, target.chart_points, Y_AXIS_DEFAULT, CHART_HOURS);
+    }
+  });
+
+  document.querySelectorAll(".y-axis-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const canvasId = button.dataset.chart;
+      const state = chartState.get(canvasId);
+      if (!state) return;
+      const delta = Number(button.dataset.delta);
+      const step = yAxisStep(state.yMax);
+      let next = state.yMax + delta * step;
+      if (step === 0.1) {
+        next = Math.round(next * 10) / 10;
+      } else {
+        next = Math.round(next);
+      }
+      next = Math.max(Y_AXIS_MIN, next);
+      setYAxisMax(canvasId, next);
+    });
+  });
+
+  document.querySelectorAll(".x-axis-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const canvasId = button.dataset.chart;
+      const state = chartState.get(canvasId);
+      if (!state) return;
+      const factor = Number(button.dataset.factor);
+      const minFraction = minXViewFraction(state.allPoints.length);
+      state.xViewFraction = Math.min(1, Math.max(minFraction, state.xViewFraction * factor));
+      updateChartView(canvasId);
+    });
+  });
+</script>
+{% endif %}
 {% endblock %}

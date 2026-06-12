@@ -17,64 +17,37 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
+        settings = get_settings()
         with get_session() as session:
-            latest = queries.latest_results(session)
-            targets = [
-                {
-                    "name": result.target_name,
-                    "url": result.url,
-                    "checked_at": result.checked_at,
-                    "http_status_code": result.http_status_code,
-                    "time_total": queries.as_float(result.time_total),
-                    "error": result.error,
-                    "status": queries.result_status(result),
-                }
-                for result in latest
-            ]
+            targets = []
+            for chart_id, name in enumerate(queries.list_target_names(session)):
+                results = queries.recent_results(
+                    session,
+                    name,
+                    hours=settings.web_results_hours,
+                )
+                latest = results[0] if results else None
+                targets.append(
+                    {
+                        "chart_id": chart_id,
+                        "name": name,
+                        "url": queries.get_target_url(session, name),
+                        "chart_points": [
+                            queries.result_to_chart_point(result)
+                            for result in reversed(results)
+                        ],
+                        "status": queries.result_status(latest) if latest else "error",
+                        "http_status_code": latest.http_status_code if latest else None,
+                        "error": latest.error if latest else None,
+                    }
+                )
 
         return templates.TemplateResponse(
             request,
             "index.html",
-            {"targets": targets},
-        )
-
-    @app.get("/targets/{target_name}", response_class=HTMLResponse)
-    def target_detail(request: Request, target_name: str) -> HTMLResponse:
-        settings = get_settings()
-        with get_session() as session:
-            if target_name not in queries.list_target_names(session):
-                raise HTTPException(status_code=404, detail="Target not found")
-
-            url = queries.get_target_url(session, target_name)
-            results = queries.recent_results(
-                session,
-                target_name,
-                hours=settings.web_results_hours,
-            )
-            chart_points = [
-                queries.result_to_chart_point(result) for result in reversed(results)
-            ]
-            table_rows = [
-                {
-                    "checked_at": result.checked_at,
-                    "http_status_code": result.http_status_code,
-                    "segments": queries.timing_segments(result),
-                    "time_total": queries.as_float(result.time_total),
-                    "error": result.error,
-                    "status": queries.result_status(result),
-                }
-                for result in results[:200]
-            ]
-
-        return templates.TemplateResponse(
-            request,
-            "target.html",
             {
-                "target_name": target_name,
-                "url": url,
+                "targets": targets,
                 "hours": settings.web_results_hours,
-                "chart_points": chart_points,
-                "results": table_rows,
             },
         )
 

@@ -6,6 +6,16 @@ from sqlalchemy.orm import Session
 
 from models import HealthcheckResult
 
+# Cumulative curl -w fields stored in the database (in order).
+CURL_TIMING_FIELDS = (
+    "time_namelookup",
+    "time_connect",
+    "time_appconnect",
+    "time_pretransfer",
+    "time_starttransfer",
+    "time_total",
+)
+
 
 def as_float(value: float | Decimal | None) -> float | None:
     if value is None:
@@ -76,39 +86,31 @@ def recent_results(
     )
 
 
-def _delta(earlier: float | None, later: float | None) -> float:
-    if later is None:
-        return 0.0
-    if earlier is None:
-        return later
-    return max(0.0, later - earlier)
-
-
-def timing_segments(result: HealthcheckResult) -> dict[str, float]:
-    """Break cumulative curl timings into stacked segments (seconds)."""
-    namelookup = as_float(result.time_namelookup)
-    connect = as_float(result.time_connect)
-    appconnect = as_float(result.time_appconnect)
-    pretransfer = as_float(result.time_pretransfer)
-    starttransfer = as_float(result.time_starttransfer)
-    total = as_float(result.time_total)
-
+def cumulative_timings(result: HealthcheckResult) -> dict[str, float | None]:
+    """Cumulative curl -w values as stored in the database."""
     return {
-        "dns": namelookup or 0.0,
-        "tcp": _delta(namelookup, connect),
-        "tls": _delta(connect, appconnect),
-        "request": _delta(appconnect, pretransfer),
-        "server": _delta(pretransfer, starttransfer),
-        "transfer": _delta(starttransfer, total),
+        field: as_float(getattr(result, field))
+        for field in CURL_TIMING_FIELDS
     }
 
 
+def timing_stack(result: HealthcheckResult) -> dict[str, float]:
+    """Increment between each cumulative curl timing (for stacked charts)."""
+    previous = 0.0
+    stack: dict[str, float] = {}
+    for field in CURL_TIMING_FIELDS:
+        cumulative = as_float(getattr(result, field)) or 0.0
+        stack[field] = max(0.0, cumulative - previous)
+        previous = cumulative
+    return stack
+
+
 def result_to_chart_point(result: HealthcheckResult) -> dict:
-    segments = timing_segments(result)
+    cumulative = cumulative_timings(result)
     return {
         "t": result.checked_at.isoformat(),
-        "total": as_float(result.time_total),
         "status": result_status(result),
         "code": result.http_status_code,
-        **segments,
+        "cumulative": cumulative,
+        **timing_stack(result),
     }

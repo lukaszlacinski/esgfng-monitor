@@ -123,8 +123,7 @@ Open [http://127.0.0.1:8080](http://127.0.0.1:8080). Pages:
 
 | URL | Description |
 |-----|-------------|
-| `/` | Overview of all targets with latest status |
-| `/targets/{name}` | Response-time chart and recent probes for one target |
+| `/` | Response-time charts for all targets |
 | `/api/targets` | JSON summary of latest results per target |
 | `/api/targets/{name}/results` | JSON time series for charts |
 
