@@ -66,7 +66,7 @@
             <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
           </tr>
           <tr>
-            <th scope="row">average</th>
+            <th scope="row">mean</th>
             <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
           </tr>
           <tr>
@@ -177,7 +177,7 @@
       : sorted[mid];
   }
 
-  function average(values) {
+  function mean(values) {
     if (values.length === 0) return null;
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }
@@ -195,7 +195,7 @@
       stats[segment.key] = {
         min: values.length ? Math.min(...values) : null,
         median: median(values),
-        average: average(values),
+        mean: mean(values),
         max: values.length ? Math.max(...values) : null,
       };
     }
@@ -206,7 +206,7 @@
     const table = document.getElementById(`stats-${canvasId}`);
     if (!table) return;
     const stats = computeTimingStats(points);
-    const statKeys = ["min", "median", "average", "max"];
+    const statKeys = ["min", "median", "mean", "max"];
     table.querySelectorAll("tbody tr").forEach((row, rowIndex) => {
       row.querySelectorAll("td").forEach((cell, colIndex) => {
         const segment = segmentDefs[colIndex];
