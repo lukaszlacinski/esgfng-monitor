@@ -129,6 +129,51 @@ Open [http://127.0.0.1:8080](http://127.0.0.1:8080). Pages:
 
 Bind to all interfaces with `MONITOR_WEB_HOST=0.0.0.0` in `.env` when running behind a reverse proxy.
 
+### Run with Supervisor
+
+To keep the dashboard running across reboots and restarts (without systemd), use [Supervisor](http://supervisord.org/). Database settings, bind address, and port are read from `.env` in the project root — do not duplicate them in the supervisor config.
+
+1. Install Supervisor (Ubuntu/Debian):
+
+```bash
+sudo apt install supervisor
+```
+
+2. Copy and edit the example config; set `directory`, `command`, and `user` to match your install:
+
+```bash
+sudo cp config/supervisor.conf.example /etc/supervisor/conf.d/esgfng-monitor.conf
+# edit /etc/supervisor/conf.d/esgfng-monitor.conf
+```
+
+3. Load the program:
+
+```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl status esgfng-monitor
+```
+
+Useful commands:
+
+```bash
+sudo supervisorctl start esgfng-monitor
+sudo supervisorctl stop esgfng-monitor
+sudo supervisorctl restart esgfng-monitor
+sudo tail -f /var/log/supervisor/esgfng-monitor.log
+```
+
+Example program definition (also in `config/supervisor.conf.example`):
+
+```ini
+[program:esgfng-monitor]
+directory=/path/to/esgfng-monitor
+command=/path/to/esgfng-monitor/.venv/bin/esgfng-monitor serve
+user=ubuntu
+autostart=true
+autorestart=true
+```
+
 ## Cron setup
 
 Cron does not load your shell profile, so `esgfng-monitor` will not be on `PATH`. Each job changes into the project directory first, then runs `.venv/bin/esgfng-monitor`. Database settings and other configuration are read from `.env` in the project root — do not duplicate them in the crontab.

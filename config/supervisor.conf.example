@@ -1,0 +1,22 @@
+; Supervisor program for the ESGF-NG Monitor web dashboard.
+;
+; Install (Ubuntu/Debian):
+;   sudo apt install supervisor
+;   sudo cp config/supervisor.conf.example /etc/supervisor/conf.d/esgfng-monitor.conf
+;   # edit paths and user below
+;   sudo supervisorctl reread
+;   sudo supervisorctl update
+;   sudo supervisorctl status esgfng-monitor
+;
+; Configuration (database, bind host/port) is read from .env in the project root.
+
+[program:esgfng-monitor]
+directory=/path/to/esgfng-monitor
+command=/path/to/esgfng-monitor/.venv/bin/esgfng-monitor serve
+user=ubuntu
+autostart=true
+autorestart=true
+startsecs=3
+stopwaitsecs=10
+stdout_logfile=/var/log/supervisor/esgfng-monitor.log
+stderr_logfile=/var/log/supervisor/esgfng-monitor.err.log
