@@ -131,48 +131,46 @@ Bind to all interfaces with `MONITOR_WEB_HOST=0.0.0.0` in `.env` when running be
 
 ### Run with Supervisor
 
-To keep the dashboard running across reboots and restarts (without systemd), use [Supervisor](http://supervisord.org/). Database settings, bind address, and port are read from `.env` in the project root — do not duplicate them in the supervisor config.
+To keep the dashboard running across restarts (without systemd or sudo), run [Supervisor](http://supervisord.org/) in user mode from the project venv. Database settings, bind address, and port are read from `.env` in the project root — do not duplicate them in the supervisor config.
 
-1. Install Supervisor (Ubuntu/Debian):
-
-```bash
-sudo apt install supervisor
-```
-
-2. Copy and edit the example config; set `directory`, `command`, and `user` to match your install:
+1. Install Supervisor into the project venv:
 
 ```bash
-sudo cp config/supervisor.conf.example /etc/supervisor/conf.d/esgfng-monitor.conf
-# edit /etc/supervisor/conf.d/esgfng-monitor.conf
+cd /path/to/esgfng-monitor
+.venv/bin/pip install supervisor
 ```
 
-3. Load the program:
+2. Copy the example config into `run/` and replace `/path/to/esgfng-monitor` with your clone path:
 
 ```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl status esgfng-monitor
+mkdir -p run
+cp config/supervisor.conf.example run/supervisord.conf
+# edit run/supervisord.conf
 ```
 
-Useful commands:
+3. Start supervisord and check status:
 
 ```bash
-sudo supervisorctl start esgfng-monitor
-sudo supervisorctl stop esgfng-monitor
-sudo supervisorctl restart esgfng-monitor
-sudo tail -f /var/log/supervisor/esgfng-monitor.log
+.venv/bin/supervisord -c run/supervisord.conf
+.venv/bin/supervisorctl -c run/supervisord.conf status
 ```
 
-Example program definition (also in `config/supervisor.conf.example`):
+Useful commands (always pass `-c run/supervisord.conf`):
 
-```ini
-[program:esgfng-monitor]
-directory=/path/to/esgfng-monitor
-command=/path/to/esgfng-monitor/.venv/bin/esgfng-monitor serve
-user=ubuntu
-autostart=true
-autorestart=true
+```bash
+.venv/bin/supervisorctl -c run/supervisord.conf start esgfng-monitor
+.venv/bin/supervisorctl -c run/supervisord.conf stop esgfng-monitor
+.venv/bin/supervisorctl -c run/supervisord.conf restart esgfng-monitor
+tail -f run/esgfng-monitor.log
 ```
+
+To start supervisord after reboot, add a `@reboot` line to your user crontab (same pattern as probes — set `ESGFNG_MONITOR_HOME`):
+
+```cron
+@reboot cd $ESGFNG_MONITOR_HOME && .venv/bin/supervisord -c run/supervisord.conf
+```
+
+Logs and runtime files (`supervisor.sock`, pid file) live in `run/` (gitignored). Full example config: `config/supervisor.conf.example`.
 
 ## Cron setup
 

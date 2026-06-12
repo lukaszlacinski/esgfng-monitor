@@ -1,22 +1,39 @@
-; Supervisor program for the ESGF-NG Monitor web dashboard.
+; User-level Supervisor for the ESGF-NG Monitor web dashboard (no sudo).
 ;
-; Install (Ubuntu/Debian):
-;   sudo apt install supervisor
-;   sudo cp config/supervisor.conf.example /etc/supervisor/conf.d/esgfng-monitor.conf
-;   # edit paths and user below
-;   sudo supervisorctl reread
-;   sudo supervisorctl update
-;   sudo supervisorctl status esgfng-monitor
+;   cd /path/to/esgfng-monitor
+;   .venv/bin/pip install supervisor
+;   mkdir -p run
+;   cp config/supervisor.conf.example run/supervisord.conf
+;   # replace /path/to/esgfng-monitor in run/supervisord.conf
+;   .venv/bin/supervisord -c run/supervisord.conf
+;   .venv/bin/supervisorctl -c run/supervisord.conf status
 ;
 ; Configuration (database, bind host/port) is read from .env in the project root.
+; Logs and runtime files go in run/ (gitignored).
+
+[unix_http_server]
+file=/path/to/esgfng-monitor/run/supervisor.sock
+
+[supervisord]
+logfile=/path/to/esgfng-monitor/run/supervisord.log
+pidfile=/path/to/esgfng-monitor/run/supervisord.pid
+childlogdir=/path/to/esgfng-monitor/run
+directory=/path/to/esgfng-monitor
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisorctl]
+serverurl=unix:///path/to/esgfng-monitor/run/supervisor.sock
 
 [program:esgfng-monitor]
 directory=/path/to/esgfng-monitor
 command=/path/to/esgfng-monitor/.venv/bin/esgfng-monitor serve
-user=ubuntu
 autostart=true
 autorestart=true
 startsecs=3
 stopwaitsecs=10
-stdout_logfile=/var/log/supervisor/esgfng-monitor.log
-stderr_logfile=/var/log/supervisor/esgfng-monitor.err.log
+stdout_logfile=/path/to/esgfng-monitor/run/esgfng-monitor.log
+stderr_logfile=/path/to/esgfng-monitor/run/esgfng-monitor.err.log
+stdout_logfile_maxbytes=5MB
+stderr_logfile_maxbytes=5MB
