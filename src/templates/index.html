@@ -182,7 +182,7 @@
     for (const segment of segmentDefs) {
       const values = points
         .map((point) => statsValue(point, segment))
-        .filter((value) => value != null);
+        .filter((value) => value != null && value !== 0);
       stats[segment.key] = {
         min: values.length ? Math.min(...values) : null,
         median: median(values),
