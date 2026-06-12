@@ -148,12 +148,14 @@ cp config/supervisor.conf.example run/supervisord.conf
 # edit run/supervisord.conf
 ```
 
-3. Start supervisord and check status:
+3. Start the supervisord daemon first (it creates `run/supervisor.sock`), then use `supervisorctl`:
 
 ```bash
 .venv/bin/supervisord -c run/supervisord.conf
 .venv/bin/supervisorctl -c run/supervisord.conf status
 ```
+
+`supervisorctl` talks to a running `supervisord` — if you see `supervisor.sock no such file`, start step 3 again or check `run/supervisord.log` for errors. Use the same `-c` path for both commands.
 
 Useful commands (always pass `-c run/supervisord.conf`):
 

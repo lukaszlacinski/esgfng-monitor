@@ -45,7 +45,7 @@
     </div>
     <div class="stats-wrap">
       <table class="stats-table mono" id="stats-chart-{{ target.chart_id }}">
-        <caption class="muted">Cumulative timings (s), visible range</caption>
+        <caption class="muted">Per-step timings (s), visible range</caption>
         <thead>
           <tr>
             <th scope="col"></th>
@@ -167,7 +167,7 @@
     const stats = {};
     for (const segment of segmentDefs) {
       const values = points
-        .map((point) => point.cumulative[segment.key])
+        .map((point) => point[segment.key])
         .filter((value) => value != null);
       stats[segment.key] = {
         min: values.length ? Math.min(...values) : null,

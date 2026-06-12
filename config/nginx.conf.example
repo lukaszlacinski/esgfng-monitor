@@ -1,0 +1,68 @@
+# Reverse proxy for the ESGF-NG Monitor web dashboard (uvicorn on 127.0.0.1:8080).
+#
+# Prerequisites in .env:
+#   MONITOR_WEB_HOST=127.0.0.1
+#   MONITOR_WEB_PORT=8080
+#
+# Install (Ubuntu/Debian):
+#   sudo apt install nginx
+#   sudo cp config/nginx.conf.example /etc/nginx/sites-available/esgfng-monitor
+#   # edit server_name and paths
+#   sudo ln -s /etc/nginx/sites-available/esgfng-monitor /etc/nginx/sites-enabled/
+#   sudo nginx -t
+#   sudo systemctl reload nginx
+#
+# HTTPS with Let's Encrypt (optional):
+#   sudo apt install certbot python3-certbot-nginx
+#   sudo certbot --nginx -d monitor.example.org
+
+upstream esgfng_monitor {
+    server 127.0.0.1:8080;
+    keepalive 8;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name monitor.example.org;
+
+    # Redirect HTTP to HTTPS (uncomment after TLS is configured):
+    # return 301 https://$host$request_uri;
+
+    location / {
+        proxy_pass http://esgfng_monitor;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+
+# server {
+#     listen 443 ssl http2;
+#     listen [::]:443 ssl http2;
+#     server_name monitor.example.org;
+#
+#     ssl_certificate     /etc/letsencrypt/live/monitor.example.org/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/monitor.example.org/privkey.pem;
+#
+#     location / {
+#         proxy_pass http://esgfng_monitor;
+#         proxy_http_version 1.1;
+#
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#
+#         proxy_connect_timeout 10s;
+#         proxy_send_timeout 60s;
+#         proxy_read_timeout 60s;
+#     }
+# }
